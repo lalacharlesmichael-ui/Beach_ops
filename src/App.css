@@ -2302,6 +2302,16 @@ select {
   font-weight: 800;
 }
 
+.connection-status svg {
+  flex: 0 0 auto;
+}
+
+.connection-status span {
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .connection-status.error {
   border-color: rgba(255, 155, 134, 0.38);
   color: #ffe6df;
@@ -2380,6 +2390,12 @@ select {
 .login-submit:hover,
 .login-submit:focus-visible {
   transform: translateY(-1px);
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
 }
 
 .public-inventory-panel {

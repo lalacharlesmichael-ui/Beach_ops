@@ -74,7 +74,7 @@ import {
   upsertStaffAccounts,
   upsertTables,
 } from './lib/databaseApi'
-import { isSupabaseConfigured } from './lib/supabaseClient'
+import { isSupabaseConfigured, supabaseConfigError } from './lib/supabaseClient'
 import './App.css'
 
 const SESSION_STORAGE_KEY = 'beach-project-current-user-id'
@@ -328,6 +328,7 @@ function App() {
   const [soundOn, setSoundOn] = useState(true)
   const [notice, setNotice] = useState(null)
   const [databaseReady, setDatabaseReady] = useState(false)
+  const [databaseConnected, setDatabaseConnected] = useState(false)
   const [databaseError, setDatabaseError] = useState('')
   const [loadingMessage, setLoadingMessage] = useState('Connecting to Supabase...')
   const [tableSearch, setTableSearch] = useState('')
@@ -360,13 +361,15 @@ function App() {
 
     async function syncInitialData() {
       if (!isSupabaseConfigured) {
-        setDatabaseError('Supabase environment variables are missing.')
+        setDatabaseConnected(false)
+        setDatabaseError(supabaseConfigError || 'Supabase environment variables are missing.')
         setLoadingMessage('')
         setDatabaseReady(true)
         return
       }
 
       setDatabaseReady(false)
+      setDatabaseConnected(false)
       setLoadingMessage('Connecting to Supabase...')
 
       try {
@@ -419,9 +422,11 @@ function App() {
           setActiveView(navigationByRole[storedUser.role]?.[0] || 'Dashboard')
         }
 
+        setDatabaseConnected(true)
         setDatabaseError('')
       } catch (error) {
         if (cancelled) return
+        setDatabaseConnected(false)
         setDatabaseError(error.message)
         setNotice({ message: `Supabase connection failed: ${error.message}`, type: 'error' })
         alertToast.fire({
@@ -443,7 +448,10 @@ function App() {
     }
   }, [])
 
-  const currentUser = staffAccounts.find((account) => account.id === currentUserId && account.status === 'Active') || null
+  const canUseDatabase = databaseReady && databaseConnected
+  const currentUser = canUseDatabase
+    ? staffAccounts.find((account) => account.id === currentUserId && account.status === 'Active') || null
+    : null
   const role = currentUser?.role || 'Guest'
   const currentStaff = currentUser?.name || 'System'
   const allowedViews = navigationByRole[role] || []
@@ -573,6 +581,10 @@ function App() {
     event.preventDefault()
     if (!databaseReady) {
       notify('Please wait for Supabase to finish loading.', 'error')
+      return
+    }
+    if (!databaseConnected) {
+      notify(`Supabase is not connected: ${databaseError || 'check the deployment environment variables.'}`, 'error')
       return
     }
 
@@ -2659,10 +2671,21 @@ function App() {
               <span>Sign in to your account</span>
             </div>
 
-            {(!databaseReady || databaseError) && (
-              <div className={`connection-status ${databaseError ? 'error' : ''}`} role={databaseError ? 'alert' : 'status'}>
-                {databaseError ? <CircleAlert size={16} aria-hidden="true" /> : <Database size={16} aria-hidden="true" />}
-                <span>{databaseError ? 'Supabase connection needs attention' : 'Connecting to Supabase'}</span>
+            {(!databaseReady || !databaseConnected || databaseError) && (
+              <div
+                className={`connection-status ${databaseReady && (!databaseConnected || databaseError) ? 'error' : ''}`}
+                role={databaseReady && (!databaseConnected || databaseError) ? 'alert' : 'status'}
+              >
+                {databaseReady && (!databaseConnected || databaseError) ? (
+                  <CircleAlert size={16} aria-hidden="true" />
+                ) : (
+                  <Database size={16} aria-hidden="true" />
+                )}
+                <span>
+                  {!databaseReady
+                    ? 'Connecting to Supabase'
+                    : databaseError || 'Supabase is not connected.'}
+                </span>
               </div>
             )}
 
@@ -2704,7 +2727,7 @@ function App() {
                   <span>{loginError}</span>
                 </div>
               )}
-              <button className="login-submit" disabled={!databaseReady} type="submit">
+              <button className="login-submit" disabled={!canUseDatabase} type="submit">
                 <IconLabel icon={ShieldCheck}>Log in</IconLabel>
               </button>
             </form>

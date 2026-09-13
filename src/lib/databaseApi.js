@@ -1,16 +1,27 @@
-import { isSupabaseConfigured, supabase } from './supabaseClient'
+import { isSupabaseConfigured, supabase, supabaseConfigError } from './supabaseClient'
 
 function requireSupabase() {
   if (!isSupabaseConfigured || !supabase) {
-    throw new Error('Supabase is missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.')
+    throw new Error(supabaseConfigError || 'Supabase is not configured.')
   }
 
   return supabase
 }
 
+function formatSupabaseError(error) {
+  return [
+    error.message,
+    error.details,
+    error.hint ? `Hint: ${error.hint}` : '',
+    error.code ? `Code: ${error.code}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
 function throwIfError(error) {
   if (error) {
-    throw new Error(error.message)
+    throw new Error(formatSupabaseError(error))
   }
 }
 

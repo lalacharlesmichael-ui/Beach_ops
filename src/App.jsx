@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChefHat,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   CircleDollarSign,
@@ -178,6 +179,47 @@ const weeklySales = [
   { label: 'Sun', sales: 0 },
 ]
 
+const chartTheme = {
+  grid: '#d8e6f1',
+  axis: '#5f7188',
+  areaStroke: '#0f766e',
+  areaFill: '#d7f3ed',
+  barFill: '#2563eb',
+  barFillAlt: '#0ea5e9',
+  tooltipBorder: '#d8e6f1',
+}
+
+const pageSizes = {
+  tableCards: 6,
+  orderMenu: 8,
+  paymentQueue: 6,
+  paymentHistory: 8,
+  kitchenQueue: 6,
+  activeOrders: 6,
+  menuAdmin: 6,
+  expenses: 8,
+  staff: 8,
+  audit: 8,
+  publicInventory: 6,
+}
+
+function paginateItems(items, page, pageSize) {
+  const totalItems = items.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const currentPage = Math.min(Math.max(page, 1), totalPages)
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalItems)
+
+  return {
+    items: items.slice(startIndex, endIndex),
+    currentPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  }
+}
+
 function cents(value) {
   return Number(value) || 0
 }
@@ -276,12 +318,13 @@ function IconLabel({ icon: Icon, children }) {
   )
 }
 
-function EmptyState({ icon: Icon = PackageOpen, title, body }) {
+function EmptyState({ icon: Icon = PackageOpen, title, body, action }) {
   return (
     <div className="empty-state">
       <Icon size={32} aria-hidden="true" />
       <strong>{title}</strong>
       <span>{body}</span>
+      {action}
     </div>
   )
 }
@@ -296,6 +339,41 @@ function LoadingOverlay({ message }) {
         <strong>{message}</strong>
       </div>
     </div>
+  )
+}
+
+function PaginationControls({ label, pageInfo, onPageChange }) {
+  if (pageInfo.totalPages <= 1) return null
+
+  return (
+    <nav className="pagination-bar" aria-label={`${label} pagination`}>
+      <span>
+        Showing {pageInfo.startIndex + 1}-{pageInfo.endIndex} of {pageInfo.totalItems}
+      </span>
+      <div className="pagination-actions">
+        <button
+          className="icon-button"
+          type="button"
+          aria-label={`Previous ${label} page`}
+          disabled={pageInfo.currentPage <= 1}
+          onClick={() => onPageChange(pageInfo.currentPage - 1)}
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <strong>
+          Page {pageInfo.currentPage} of {pageInfo.totalPages}
+        </strong>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label={`Next ${label} page`}
+          disabled={pageInfo.currentPage >= pageInfo.totalPages}
+          onClick={() => onPageChange(pageInfo.currentPage + 1)}
+        >
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      </div>
+    </nav>
   )
 }
 
@@ -325,6 +403,7 @@ function App() {
   const [confirmingPaymentId, setConfirmingPaymentId] = useState(null)
   const [invoiceOrderId, setInvoiceOrderId] = useState(null)
   const [activeModal, setActiveModal] = useState(null)
+  const [detailModal, setDetailModal] = useState(null)
   const [soundOn, setSoundOn] = useState(true)
   const [notice, setNotice] = useState(null)
   const [databaseReady, setDatabaseReady] = useState(false)
@@ -335,6 +414,25 @@ function App() {
   const [menuSearch, setMenuSearch] = useState('')
   const [publicInventoryFilter, setPublicInventoryFilter] = useState('All')
   const [publicInventorySearch, setPublicInventorySearch] = useState('')
+  const [paymentHistorySearch, setPaymentHistorySearch] = useState('')
+  const [expenseSearch, setExpenseSearch] = useState('')
+  const [staffSearch, setStaffSearch] = useState('')
+  const [auditSearch, setAuditSearch] = useState('')
+  const [menuAdminSearch, setMenuAdminSearch] = useState('')
+  const [menuAdminStockFilter, setMenuAdminStockFilter] = useState('All')
+  const [activeOrderFilter, setActiveOrderFilter] = useState('All')
+  const [kitchenQueueFilter, setKitchenQueueFilter] = useState('All')
+  const [tablePage, setTablePage] = useState(1)
+  const [orderMenuPage, setOrderMenuPage] = useState(1)
+  const [paymentQueuePage, setPaymentQueuePage] = useState(1)
+  const [paymentHistoryPage, setPaymentHistoryPage] = useState(1)
+  const [kitchenQueuePage, setKitchenQueuePage] = useState(1)
+  const [activeOrdersPage, setActiveOrdersPage] = useState(1)
+  const [menuAdminPage, setMenuAdminPage] = useState(1)
+  const [expensePage, setExpensePage] = useState(1)
+  const [staffPage, setStaffPage] = useState(1)
+  const [auditPage, setAuditPage] = useState(1)
+  const [publicInventoryPage, setPublicInventoryPage] = useState(1)
   const [reportRange, setReportRange] = useState('Daily')
   const [expenseDraft, setExpenseDraft] = useState({ category: 'Produce', description: '', amount: '' })
   const [menuDraft, setMenuDraft] = useState({
@@ -615,6 +713,7 @@ function App() {
     setCurrentUserId(null)
     setActiveView('Dashboard')
     setActiveModal(null)
+    setDetailModal(null)
     setSidebarOpen(false)
     setInvoiceOrderId(null)
     setLoginDraft({ username: '', password: '' })
@@ -624,7 +723,28 @@ function App() {
   function goToView(view) {
     setActiveView(view)
     setActiveModal(null)
+    setDetailModal(null)
     setSidebarOpen(false)
+  }
+
+  function openDetailModal(type, id) {
+    setDetailModal({ type, id })
+  }
+
+  function handleDashboardShortcut(item) {
+    if (item.kitchenFilter) {
+      setKitchenQueueFilter(item.kitchenFilter)
+      setKitchenQueuePage(1)
+    }
+
+    if (item.activeOrderFilter) {
+      setActiveOrderFilter(item.activeOrderFilter)
+      setActiveOrdersPage(1)
+    }
+
+    if (item.view) {
+      goToView(item.view)
+    }
   }
 
   async function applyStockChange(orderItems, multiplier) {
@@ -1178,6 +1298,15 @@ function App() {
     if (!staff) return
 
     const nextStatus = staff.status === 'Active' ? 'Inactive' : 'Active'
+    const confirmed = await confirmAction({
+      title: `${nextStatus === 'Active' ? 'Activate' : 'Deactivate'} ${staff.name}?`,
+      text: nextStatus === 'Active'
+        ? 'This account will be able to sign in again.'
+        : 'This account will no longer be able to sign in.',
+      confirmButtonText: nextStatus === 'Active' ? 'Activate account' : 'Deactivate account',
+    })
+    if (!confirmed) return
+
     try {
       await withLoading('Updating staff account...', () => updateStaffAccount(staffId, { status: nextStatus }))
     } catch (error) {
@@ -1236,14 +1365,14 @@ function App() {
 
   function metrics() {
     return [
-      { label: "Today's gross sales", value: formatMoney(paidSalesTotal), icon: CircleDollarSign, accent: 'teal' },
-      { label: 'Orders today', value: orders.length, icon: ClipboardCheck, accent: 'sky' },
-      { label: 'Cash payments', value: formatMoney(paidSalesTotal), icon: Banknote, accent: 'green' },
-      { label: 'Awaiting payment', value: pendingPaymentOrders.length, icon: Wallet, accent: 'cyan' },
-      { label: 'Occupied tables', value: tables.filter((table) => table.status === 'Occupied').length, icon: Table2, accent: 'blue' },
-      { label: 'Preparing', value: orders.filter((order) => order.status === 'Preparing').length, icon: ChefHat, accent: 'violet' },
-      { label: 'Ready to serve', value: orders.filter((order) => order.status === 'Ready').length, icon: CheckCircle2, accent: 'cyan' },
-      { label: "Today's expenses", value: formatMoney(expenseTotal), icon: ScrollText, accent: 'red' },
+      { label: "Today's gross sales", value: formatMoney(paidSalesTotal), icon: CircleDollarSign, accent: 'teal', view: 'Reports' },
+      { label: 'Orders today', value: orders.length, icon: ClipboardCheck, accent: 'sky', view: 'Active Orders' },
+      { label: 'Cash payments', value: formatMoney(paidSalesTotal), icon: Banknote, accent: 'green', view: 'Payments' },
+      { label: 'Awaiting payment', value: pendingPaymentOrders.length, icon: Wallet, accent: 'cyan', view: 'Payments' },
+      { label: 'Occupied tables', value: tables.filter((table) => table.status === 'Occupied').length, icon: Table2, accent: 'blue', view: 'Tables' },
+      { label: 'Preparing', value: orders.filter((order) => order.status === 'Preparing').length, icon: ChefHat, accent: 'violet', view: 'Kitchen/Bar Queue', kitchenFilter: 'Preparing' },
+      { label: 'Ready to serve', value: orders.filter((order) => order.status === 'Ready').length, icon: CheckCircle2, accent: 'cyan', view: 'Kitchen/Bar Queue', kitchenFilter: 'Ready' },
+      { label: "Today's expenses", value: formatMoney(expenseTotal), icon: ScrollText, accent: 'red', view: 'Expenses' },
     ]
   }
 
@@ -1261,13 +1390,18 @@ function App() {
         />
         <section className="metric-grid" aria-label="Current business metrics">
           {metrics().map((item) => (
-            <article className={`metric-card accent-${item.accent}`} key={item.label}>
+            <button
+              className={`metric-card metric-button accent-${item.accent}`}
+              type="button"
+              key={item.label}
+              onClick={() => handleDashboardShortcut(item)}
+            >
               <div>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
               </div>
               <item.icon size={24} aria-hidden="true" />
-            </article>
+            </button>
           ))}
         </section>
 
@@ -1283,11 +1417,20 @@ function App() {
             <div className="chart-box">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklySales}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E7DCE6" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(value) => formatMoney(Number(value) * 100)} />
-                  <Area type="monotone" dataKey="sales" stroke="#24124F" fill="#E9E0F1" strokeWidth={3} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <Tooltip
+                    contentStyle={{ borderColor: chartTheme.tooltipBorder, borderRadius: 8 }}
+                    formatter={(value) => formatMoney(Number(value) * 100)}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke={chartTheme.areaStroke}
+                    fill={chartTheme.areaFill}
+                    strokeWidth={3}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -1304,11 +1447,14 @@ function App() {
             <div className="chart-box">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categorySalesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E7DCE6" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(value) => formatMoney(Number(value) * 100)} />
-                  <Bar dataKey="value" fill="#FF6243" radius={[6, 6, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <Tooltip
+                    contentStyle={{ borderColor: chartTheme.tooltipBorder, borderRadius: 8 }}
+                    formatter={(value) => formatMoney(Number(value) * 100)}
+                  />
+                  <Bar dataKey="value" fill={chartTheme.barFill} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1367,6 +1513,8 @@ function App() {
   }
 
   function renderTables() {
+    const tablePageInfo = paginateItems(filteredTables, tablePage, pageSizes.tableCards)
+
     return (
       <div className="view-stack">
         <ViewHeader
@@ -1378,14 +1526,17 @@ function App() {
               <input
                 type="search"
                 value={tableSearch}
-                onChange={(event) => setTableSearch(event.target.value)}
+                onChange={(event) => {
+                  setTableSearch(event.target.value)
+                  setTablePage(1)
+                }}
                 placeholder="Search tables"
               />
             </div>
           }
         />
         <section className="table-grid" aria-label="Restaurant tables">
-          {filteredTables.map((table) => {
+          {tablePageInfo.items.map((table) => {
             const session = openSessions.find((item) => item.tableId === table.id)
             const sessionOrders = session ? orders.filter((order) => order.sessionId === session.id) : []
             const unfinishedOrders = sessionOrders.filter(
@@ -1444,11 +1595,14 @@ function App() {
             )
           })}
         </section>
+        <PaginationControls label="tables" pageInfo={tablePageInfo} onPageChange={setTablePage} />
       </div>
     )
   }
 
   function renderOrderScreen() {
+    const menuPageInfo = paginateItems(visibleMenuItems, orderMenuPage, pageSizes.orderMenu)
+
     return (
       <div className="view-stack">
         <ViewHeader eyebrow="Staff ordering" title="New order" action={<StatusPill status={selectedTable.status} />} />
@@ -1479,7 +1633,10 @@ function App() {
                     className={selectedCategory === category ? 'active' : ''}
                     type="button"
                     key={category}
-                    onClick={() => setSelectedCategory(category)}
+                    onClick={() => {
+                      setSelectedCategory(category)
+                      setOrderMenuPage(1)
+                    }}
                   >
                     {category}
                   </button>
@@ -1490,14 +1647,17 @@ function App() {
                 <input
                   type="search"
                   value={menuSearch}
-                  onChange={(event) => setMenuSearch(event.target.value)}
+                  onChange={(event) => {
+                    setMenuSearch(event.target.value)
+                    setOrderMenuPage(1)
+                  }}
                   placeholder="Search menu"
                 />
               </div>
             </div>
             <div className="menu-grid">
               {visibleMenuItems.length ? (
-                visibleMenuItems.map((item) => {
+                menuPageInfo.items.map((item) => {
                   const orderable = item.available && Number(item.stockQty) > 0
 
                   return (
@@ -1531,6 +1691,7 @@ function App() {
                 <EmptyState icon={Utensils} title="No menu items yet" body="Add menu items from the Menu screen before ordering." />
               )}
             </div>
+            <PaginationControls label="menu items" pageInfo={menuPageInfo} onPageChange={setOrderMenuPage} />
           </section>
 
           <aside className="order-summary" id="order-summary" aria-label="Current order summary">
@@ -1612,6 +1773,15 @@ function App() {
   }
 
   function renderPayments() {
+    const paymentHistoryQuery = paymentHistorySearch.trim().toLowerCase()
+    const filteredPayments = payments.filter((payment) => {
+      if (!paymentHistoryQuery) return true
+      return `${payment.id} ${payment.orderId} ${payment.customerName} ${payment.staff} ${payment.method}`
+        .toLowerCase()
+        .includes(paymentHistoryQuery)
+    })
+    const paymentQueuePageInfo = paginateItems(pendingPaymentOrders, paymentQueuePage, pageSizes.paymentQueue)
+    const paymentHistoryPageInfo = paginateItems(filteredPayments, paymentHistoryPage, pageSizes.paymentHistory)
     const total = selectedPaymentOrder ? orderTotal(selectedPaymentOrder) : 0
     const amountReceived = selectedPaymentOrder ? inputToCents(paymentInputs[selectedPaymentOrder.id]) : 0
     const changeDue = Math.max(0, amountReceived - total)
@@ -1625,7 +1795,7 @@ function App() {
           <aside className="payment-list" aria-label="Orders awaiting payment">
             <h2>Awaiting payment</h2>
             {pendingPaymentOrders.length ? (
-              pendingPaymentOrders.map((order) => {
+              paymentQueuePageInfo.items.map((order) => {
                 const table = tables.find((item) => item.id === order.tableId)
                 return (
                   <button
@@ -1643,6 +1813,11 @@ function App() {
             ) : (
               <EmptyState icon={Wallet} title="No pending payments" body="New unpaid orders will appear here." />
             )}
+            <PaginationControls
+              label="awaiting payment orders"
+              pageInfo={paymentQueuePageInfo}
+              onPageChange={setPaymentQueuePage}
+            />
           </aside>
 
           <section className="payment-panel" aria-label="Payment confirmation">
@@ -1737,28 +1912,58 @@ function App() {
             </div>
             <Banknote size={20} aria-hidden="true" />
           </div>
+          <div className="list-toolbar">
+            <label className="search-control">
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="search"
+                value={paymentHistorySearch}
+                onChange={(event) => {
+                  setPaymentHistorySearch(event.target.value)
+                  setPaymentHistoryPage(1)
+                }}
+                placeholder="Search payments"
+              />
+            </label>
+          </div>
           <div className="data-list">
-            {payments.length ? (
-              payments.map((payment) => (
-                <div className="data-row" key={payment.id}>
+            {filteredPayments.length ? (
+              paymentHistoryPageInfo.items.map((payment) => (
+                <div className="data-row data-row-with-actions" key={payment.id}>
                   <span>{payment.orderId}</span>
                   <strong>{formatMoney(payment.amountCents)}</strong>
                   <small>{payment.customerName || 'Walk-in customer'} - {payment.staff} confirmed at {payment.time}</small>
-                  <button className="secondary-button compact-button" type="button" onClick={() => setInvoiceOrderId(payment.orderId)}>
-                    <IconLabel icon={Printer}>Invoice</IconLabel>
-                  </button>
+                  <div className="row-actions">
+                    <button className="secondary-button compact-button" type="button" onClick={() => openDetailModal('payment', payment.id)}>
+                      <IconLabel icon={Eye}>Details</IconLabel>
+                    </button>
+                    <button className="secondary-button compact-button" type="button" onClick={() => setInvoiceOrderId(payment.orderId)}>
+                      <IconLabel icon={Printer}>Invoice</IconLabel>
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <EmptyState icon={Banknote} title="No payment history" body="Paid orders will be listed here." />
+              <EmptyState icon={Banknote} title="No payment history" body="Paid orders matching your filters will be listed here." />
             )}
           </div>
+          <PaginationControls
+            label="payment history"
+            pageInfo={paymentHistoryPageInfo}
+            onPageChange={setPaymentHistoryPage}
+          />
         </section>
       </div>
     )
   }
 
   function renderKitchenQueue() {
+    const filteredKitchenOrders =
+      kitchenQueueFilter === 'All'
+        ? activeKitchenOrders
+        : activeKitchenOrders.filter((order) => order.status === kitchenQueueFilter)
+    const kitchenQueuePageInfo = paginateItems(filteredKitchenOrders, kitchenQueuePage, pageSizes.kitchenQueue)
+
     return (
       <div className="view-stack">
         <ViewHeader
@@ -1774,9 +1979,24 @@ function App() {
             </button>
           }
         />
+        <div className="category-tabs range-tabs" role="tablist" aria-label="Kitchen queue status">
+          {['All', 'Paid', 'Preparing', 'Ready'].map((status) => (
+            <button
+              className={kitchenQueueFilter === status ? 'active' : ''}
+              type="button"
+              key={status}
+              onClick={() => {
+                setKitchenQueueFilter(status)
+                setKitchenQueuePage(1)
+              }}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
         <section className="queue-grid" aria-label="Paid preparation queue">
-          {activeKitchenOrders.length ? (
-            activeKitchenOrders.map((order) => {
+          {filteredKitchenOrders.length ? (
+            kitchenQueuePageInfo.items.map((order) => {
               const table = tables.find((item) => item.id === order.tableId)
               return (
                 <article className={`queue-card status-card-${order.status.toLowerCase().replaceAll(' ', '-')}`} key={order.id}>
@@ -1804,6 +2024,9 @@ function App() {
                     ))}
                   </div>
                   <div className="button-row">
+                    <button className="ghost-button" type="button" onClick={() => openDetailModal('order', order.id)}>
+                      <IconLabel icon={Eye}>Details</IconLabel>
+                    </button>
                     <button
                       className="secondary-button"
                       disabled={order.status !== 'Paid'}
@@ -1825,21 +2048,41 @@ function App() {
               )
             })
           ) : (
-            <EmptyState icon={ChefHat} title="Queue is clear" body="Paid orders will appear here." />
+            <EmptyState icon={ChefHat} title="Queue is clear" body="Paid orders matching this filter will appear here." />
           )}
         </section>
+        <PaginationControls label="queue orders" pageInfo={kitchenQueuePageInfo} onPageChange={setKitchenQueuePage} />
       </div>
     )
   }
 
   function renderActiveOrders() {
-    const activeOrders = orders.filter((order) => !['Cancelled', 'Refunded'].includes(order.status))
+    const activeOrders = orders
+      .filter((order) => !['Cancelled', 'Refunded'].includes(order.status))
+      .filter((order) => activeOrderFilter === 'All' || order.status === activeOrderFilter)
+    const activeOrdersPageInfo = paginateItems(activeOrders, activeOrdersPage, pageSizes.activeOrders)
+
     return (
       <div className="view-stack">
         <ViewHeader eyebrow="Service status" title="Active orders" action={<StatusPill status={`${activeOrders.length} Orders`} />} />
+        <div className="category-tabs range-tabs" role="tablist" aria-label="Active order status">
+          {['All', 'Awaiting Payment', 'Paid', 'Preparing', 'Ready', 'Served'].map((status) => (
+            <button
+              className={activeOrderFilter === status ? 'active' : ''}
+              type="button"
+              key={status}
+              onClick={() => {
+                setActiveOrderFilter(status)
+                setActiveOrdersPage(1)
+              }}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
         <section className="orders-list" aria-label="Active orders">
           {activeOrders.length ? (
-            activeOrders.map((order) => {
+            activeOrdersPageInfo.items.map((order) => {
               const table = tables.find((item) => item.id === order.tableId)
               return (
                 <article className="order-row" key={order.id}>
@@ -1859,6 +2102,9 @@ function App() {
                     <strong>{formatMoney(orderTotal(order))}</strong>
                   </div>
                   <div className="button-row end">
+                    <button className="ghost-button" type="button" onClick={() => openDetailModal('order', order.id)}>
+                      <IconLabel icon={Eye}>Details</IconLabel>
+                    </button>
                     {role !== 'Kitchen' && order.status === 'Awaiting Payment' && (
                       <button
                         className="secondary-button"
@@ -1892,15 +2138,36 @@ function App() {
               )
             })
           ) : (
-            <EmptyState icon={ClipboardList} title="No active orders" body="Open a table and create an order to begin service." />
+            <EmptyState
+              icon={ClipboardList}
+              title="No active orders"
+              body="Open a table and create an order to begin service."
+              action={
+                role !== 'Kitchen' ? (
+                  <button className="primary-button" type="button" onClick={() => goToView('Tables')}>
+                    <IconLabel icon={Table2}>Open tables</IconLabel>
+                  </button>
+                ) : null
+              }
+            />
           )}
         </section>
+        <PaginationControls label="active orders" pageInfo={activeOrdersPageInfo} onPageChange={setActiveOrdersPage} />
       </div>
     )
   }
 
   function renderMenuAdmin() {
-    const activeItems = menuItems.filter((item) => !item.archived)
+    const menuAdminQuery = menuAdminSearch.trim().toLowerCase()
+    const activeItems = menuItems
+      .filter((item) => !item.archived)
+      .filter((item) => menuAdminStockFilter === 'All' || stockStatus(item) === menuAdminStockFilter)
+      .filter((item) => {
+        if (!menuAdminQuery) return true
+        return `${item.name} ${item.category} ${item.station}`.toLowerCase().includes(menuAdminQuery)
+      })
+    const menuAdminPageInfo = paginateItems(activeItems, menuAdminPage, pageSizes.menuAdmin)
+
     return (
       <div className="view-stack">
         <ViewHeader
@@ -1915,9 +2182,38 @@ function App() {
             </div>
           }
         />
+        <div className="list-toolbar split-toolbar">
+          <label className="search-control">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={menuAdminSearch}
+              onChange={(event) => {
+                setMenuAdminSearch(event.target.value)
+                setMenuAdminPage(1)
+              }}
+              placeholder="Search menu"
+            />
+          </label>
+          <div className="category-tabs compact-tabs" role="tablist" aria-label="Menu stock status">
+            {['All', 'In Stock', 'Low Stock', 'Out of Stock', 'Unavailable'].map((status) => (
+              <button
+                className={menuAdminStockFilter === status ? 'active' : ''}
+                type="button"
+                key={status}
+                onClick={() => {
+                  setMenuAdminStockFilter(status)
+                  setMenuAdminPage(1)
+                }}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
         <section className="menu-admin-grid">
           {activeItems.length ? (
-            activeItems.map((item) => (
+            menuAdminPageInfo.items.map((item) => (
               <article className={`menu-admin-card tone-${item.tone}`} key={item.id}>
                 <div className="card-topline">
                   <span>{item.category} - {item.station}</span>
@@ -1947,6 +2243,9 @@ function App() {
                 <div className="price-row">
                   <strong>{formatMoney(item.priceCents)}</strong>
                   <div className="button-row">
+                    <button className="ghost-button" type="button" onClick={() => openDetailModal('menuItem', item.id)}>
+                      <IconLabel icon={Eye}>Details</IconLabel>
+                    </button>
                     <button className="secondary-button" type="button" onClick={() => toggleMenuAvailability(item.id)}>
                       <IconLabel icon={SlidersHorizontal}>{item.available ? 'Mark unavailable' : 'Mark available'}</IconLabel>
                     </button>
@@ -1958,14 +2257,31 @@ function App() {
               </article>
             ))
           ) : (
-            <EmptyState icon={Utensils} title="No menu items yet" body="Add your first kitchen or bar item." />
+            <EmptyState
+              icon={Utensils}
+              title="No menu items found"
+              body="Adjust filters or add a new kitchen or bar item."
+              action={
+                <button className="primary-button" type="button" onClick={() => setActiveModal('menu')}>
+                  <IconLabel icon={Plus}>Add item</IconLabel>
+                </button>
+              }
+            />
           )}
         </section>
+        <PaginationControls label="menu admin items" pageInfo={menuAdminPageInfo} onPageChange={setMenuAdminPage} />
       </div>
     )
   }
 
   function renderExpenses() {
+    const expenseQuery = expenseSearch.trim().toLowerCase()
+    const filteredExpenses = expenses.filter((expense) => {
+      if (!expenseQuery) return true
+      return `${expense.category} ${expense.description} ${expense.staff}`.toLowerCase().includes(expenseQuery)
+    })
+    const expensePageInfo = paginateItems(filteredExpenses, expensePage, pageSizes.expenses)
+
     return (
       <div className="view-stack">
         <ViewHeader
@@ -1988,19 +2304,48 @@ function App() {
             </div>
             <ScrollText size={20} aria-hidden="true" />
           </div>
+          <div className="list-toolbar">
+            <label className="search-control">
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="search"
+                value={expenseSearch}
+                onChange={(event) => {
+                  setExpenseSearch(event.target.value)
+                  setExpensePage(1)
+                }}
+                placeholder="Search expenses"
+              />
+            </label>
+          </div>
           <div className="data-list">
-            {expenses.length ? (
-              expenses.map((expense) => (
-                <div className="data-row" key={expense.id}>
+            {filteredExpenses.length ? (
+              expensePageInfo.items.map((expense) => (
+                <div className="data-row data-row-with-actions" key={expense.id}>
                   <span>{expense.category}</span>
                   <strong>{formatMoney(expense.amountCents)}</strong>
                   <small>{expense.description} - {expense.staff} at {expense.time}</small>
+                  <div className="row-actions">
+                    <button className="secondary-button compact-button" type="button" onClick={() => openDetailModal('expense', expense.id)}>
+                      <IconLabel icon={Eye}>Details</IconLabel>
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <EmptyState icon={ScrollText} title="No expenses yet" body="Recorded operating expenses will appear here." />
+              <EmptyState
+                icon={ScrollText}
+                title="No expenses found"
+                body="Recorded operating expenses matching your filters will appear here."
+                action={
+                  <button className="primary-button" type="button" onClick={() => setActiveModal('expense')}>
+                    <IconLabel icon={Plus}>Record expense</IconLabel>
+                  </button>
+                }
+              />
             )}
           </div>
+          <PaginationControls label="expenses" pageInfo={expensePageInfo} onPageChange={setExpensePage} />
         </section>
       </div>
     )
@@ -2071,11 +2416,20 @@ function App() {
             <div className="chart-box">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklySales}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E7DCE6" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(value) => formatMoney(Number(value) * 100)} />
-                  <Area type="monotone" dataKey="sales" stroke="#523560" fill="#EDE3F0" strokeWidth={3} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <Tooltip
+                    contentStyle={{ borderColor: chartTheme.tooltipBorder, borderRadius: 8 }}
+                    formatter={(value) => formatMoney(Number(value) * 100)}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke={chartTheme.areaStroke}
+                    fill={chartTheme.areaFill}
+                    strokeWidth={3}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -2091,11 +2445,17 @@ function App() {
             <div className="chart-box">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={menuSalesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E7DCE6" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} interval={0} tick={{ fontSize: 11 }} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="quantity" fill="#FFC857" radius={[6, 6, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    axisLine={false}
+                    interval={0}
+                    tick={{ fill: chartTheme.axis, fontSize: 11 }}
+                  />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: chartTheme.axis }} />
+                  <Tooltip contentStyle={{ borderColor: chartTheme.tooltipBorder, borderRadius: 8 }} />
+                  <Bar dataKey="quantity" fill={chartTheme.barFillAlt} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -2106,6 +2466,13 @@ function App() {
   }
 
   function renderStaffAccounts() {
+    const staffQuery = staffSearch.trim().toLowerCase()
+    const filteredStaffAccounts = staffAccounts.filter((staff) => {
+      if (!staffQuery) return true
+      return `${staff.name} ${staff.username} ${staff.role} ${staff.status}`.toLowerCase().includes(staffQuery)
+    })
+    const staffPageInfo = paginateItems(filteredStaffAccounts, staffPage, pageSizes.staff)
+
     return (
       <div className="view-stack">
         <ViewHeader
@@ -2120,45 +2487,103 @@ function App() {
             </div>
           }
         />
+        <div className="list-toolbar">
+          <label className="search-control">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={staffSearch}
+              onChange={(event) => {
+                setStaffSearch(event.target.value)
+                setStaffPage(1)
+              }}
+              placeholder="Search staff"
+            />
+          </label>
+        </div>
         <section className="staff-grid">
-          {staffAccounts.map((staff) => (
-            <article className="staff-card" key={staff.id}>
-              <div className="staff-avatar" aria-hidden="true">{staff.name.slice(0, 1)}</div>
-              <div>
-                <h2>{staff.name}</h2>
-                <span>{staff.role} - @{staff.username}</span>
-              </div>
-              <StatusPill status={staff.status} />
-              <button className="secondary-button" type="button" onClick={() => toggleStaffStatus(staff.id)}>
-                <IconLabel icon={ShieldCheck}>{staff.status === 'Active' ? 'Deactivate' : 'Activate'}</IconLabel>
-              </button>
-            </article>
-          ))}
+          {filteredStaffAccounts.length ? (
+            staffPageInfo.items.map((staff) => (
+              <article className="staff-card" key={staff.id}>
+                <div className="staff-avatar" aria-hidden="true">{staff.name.slice(0, 1)}</div>
+                <div>
+                  <h2>{staff.name}</h2>
+                  <span>{staff.role} - @{staff.username}</span>
+                </div>
+                <StatusPill status={staff.status} />
+                <button className="ghost-button" type="button" onClick={() => openDetailModal('staff', staff.id)}>
+                  <IconLabel icon={Eye}>Details</IconLabel>
+                </button>
+                <button className="secondary-button" type="button" onClick={() => toggleStaffStatus(staff.id)}>
+                  <IconLabel icon={ShieldCheck}>{staff.status === 'Active' ? 'Deactivate' : 'Activate'}</IconLabel>
+                </button>
+              </article>
+            ))
+          ) : (
+            <EmptyState
+              icon={UserCog}
+              title="No staff found"
+              body="Staff accounts matching your search will appear here."
+              action={
+                <button className="primary-button" type="button" onClick={() => setActiveModal('staff')}>
+                  <IconLabel icon={Plus}>Add staff</IconLabel>
+                </button>
+              }
+            />
+          )}
         </section>
+        <PaginationControls label="staff accounts" pageInfo={staffPageInfo} onPageChange={setStaffPage} />
       </div>
     )
   }
 
   function renderAuditLogs() {
+    const auditQuery = auditSearch.trim().toLowerCase()
+    const filteredAuditLogs = auditLogs.filter((log) => {
+      if (!auditQuery) return true
+      return `${log.actor} ${log.action} ${log.detail} ${log.time}`.toLowerCase().includes(auditQuery)
+    })
+    const auditPageInfo = paginateItems(filteredAuditLogs, auditPage, pageSizes.audit)
+
     return (
       <div className="view-stack">
-        <ViewHeader eyebrow="Audit trail" title="Audit logs" action={<StatusPill status={`${auditLogs.length} Events`} />} />
+        <ViewHeader eyebrow="Audit trail" title="Audit logs" action={<StatusPill status={`${filteredAuditLogs.length} Events`} />} />
+        <div className="list-toolbar">
+          <label className="search-control">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={auditSearch}
+              onChange={(event) => {
+                setAuditSearch(event.target.value)
+                setAuditPage(1)
+              }}
+              placeholder="Search audit logs"
+            />
+          </label>
+        </div>
         <section className="timeline" aria-label="Audit log events">
-          {auditLogs.length ? (
-            auditLogs.map((log) => (
+          {filteredAuditLogs.length ? (
+            auditPageInfo.items.map((log) => (
               <article className="timeline-row" key={log.id}>
                 <span>{log.time}</span>
                 <div>
                   <h2>{log.action}</h2>
                   <p>{log.detail}</p>
                 </div>
-                <strong>{log.actor}</strong>
+                <div className="timeline-actions">
+                  <strong>{log.actor}</strong>
+                  <button className="secondary-button compact-button" type="button" onClick={() => openDetailModal('audit', log.id)}>
+                    <IconLabel icon={Eye}>Details</IconLabel>
+                  </button>
+                </div>
               </article>
             ))
           ) : (
-            <EmptyState icon={ScrollText} title="No audit events yet" body="System activity will be logged here." />
+            <EmptyState icon={ScrollText} title="No audit events found" body="System activity matching your search will appear here." />
           )}
         </section>
+        <PaginationControls label="audit events" pageInfo={auditPageInfo} onPageChange={setAuditPage} />
       </div>
     )
   }
@@ -2216,6 +2641,266 @@ function App() {
               ))}
             </div>
           </article>
+        </section>
+      </div>
+    )
+  }
+
+  function renderDetailModal() {
+    if (!detailModal) return null
+
+    let eyebrow = 'Details'
+    let title = ''
+    let content = null
+
+    if (detailModal.type === 'order') {
+      const order = orders.find((item) => item.id === detailModal.id)
+      if (!order) return null
+
+      const table = tables.find((item) => item.id === order.tableId)
+      const payment = payments.find((item) => item.orderId === order.id)
+      eyebrow = 'Order details'
+      title = order.id
+      content = (
+        <>
+          <div className="detail-grid-panel">
+            <div>
+              <span>Status</span>
+              <StatusPill status={order.status} />
+            </div>
+            <div>
+              <span>Payment</span>
+              <StatusPill status={order.paymentStatus} />
+            </div>
+            <div>
+              <span>Table</span>
+              <strong>{table?.name || order.tableId}</strong>
+            </div>
+            <div>
+              <span>Customer</span>
+              <strong>{payment?.customerName || order.customerName || 'Walk-in customer'}</strong>
+            </div>
+            <div>
+              <span>Total</span>
+              <strong>{formatMoney(orderTotal(order))}</strong>
+            </div>
+            <div>
+              <span>Station</span>
+              <strong>{stationsForOrder(order) || 'Unassigned'}</strong>
+            </div>
+            <div>
+              <span>Created</span>
+              <strong>{order.createdAt}</strong>
+            </div>
+            <div>
+              <span>Paid</span>
+              <strong>{order.paidAt || payment?.time || 'Not yet paid'}</strong>
+            </div>
+          </div>
+          <div className="detail-list" aria-label="Order line items">
+            {order.items.map((item) => (
+              <div className="detail-line" key={item.lineId}>
+                <div>
+                  <strong>{item.quantity} x {item.name}</strong>
+                  {item.instructions && <span>{item.instructions}</span>}
+                </div>
+                <strong>{formatMoney(item.priceCents * item.quantity)}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      )
+    }
+
+    if (detailModal.type === 'payment') {
+      const payment = payments.find((item) => item.id === detailModal.id)
+      if (!payment) return null
+
+      const order = orders.find((item) => item.id === payment.orderId)
+      const table = order ? tables.find((item) => item.id === order.tableId) : null
+      eyebrow = 'Payment details'
+      title = payment.orderId
+      content = (
+        <div className="detail-grid-panel">
+          <div>
+            <span>Status</span>
+            <StatusPill status={payment.status} />
+          </div>
+          <div>
+            <span>Method</span>
+            <strong>{payment.method}</strong>
+          </div>
+          <div>
+            <span>Amount paid</span>
+            <strong>{formatMoney(payment.amountCents)}</strong>
+          </div>
+          <div>
+            <span>Cash received</span>
+            <strong>{formatMoney(payment.amountReceivedCents || payment.amountCents)}</strong>
+          </div>
+          <div>
+            <span>Change</span>
+            <strong>{formatMoney(payment.changeCents || 0)}</strong>
+          </div>
+          <div>
+            <span>Customer</span>
+            <strong>{payment.customerName || order?.customerName || 'Walk-in customer'}</strong>
+          </div>
+          <div>
+            <span>Table</span>
+            <strong>{table?.name || order?.tableId || 'No table'}</strong>
+          </div>
+          <div>
+            <span>Cashier</span>
+            <strong>{payment.staff}</strong>
+          </div>
+          <div>
+            <span>Confirmed</span>
+            <strong>{payment.time}</strong>
+          </div>
+        </div>
+      )
+    }
+
+    if (detailModal.type === 'menuItem') {
+      const item = menuItems.find((menuItem) => menuItem.id === detailModal.id)
+      if (!item) return null
+
+      eyebrow = 'Menu item'
+      title = item.name
+      content = (
+        <div className="detail-grid-panel">
+          <div>
+            <span>Category</span>
+            <strong>{item.category}</strong>
+          </div>
+          <div>
+            <span>Station</span>
+            <strong>{item.station}</strong>
+          </div>
+          <div>
+            <span>Price</span>
+            <strong>{formatMoney(item.priceCents)}</strong>
+          </div>
+          <div>
+            <span>Stock</span>
+            <strong>{stockLabel(item)}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <StatusPill status={stockStatus(item)} />
+          </div>
+          <div>
+            <span>Archive</span>
+            <strong>{item.archived ? 'Archived' : 'Active item'}</strong>
+          </div>
+        </div>
+      )
+    }
+
+    if (detailModal.type === 'expense') {
+      const expense = expenses.find((item) => item.id === detailModal.id)
+      if (!expense) return null
+
+      eyebrow = 'Expense details'
+      title = expense.description
+      content = (
+        <div className="detail-grid-panel">
+          <div>
+            <span>Category</span>
+            <strong>{expense.category}</strong>
+          </div>
+          <div>
+            <span>Amount</span>
+            <strong>{formatMoney(expense.amountCents)}</strong>
+          </div>
+          <div>
+            <span>Recorded by</span>
+            <strong>{expense.staff}</strong>
+          </div>
+          <div>
+            <span>Time</span>
+            <strong>{expense.time}</strong>
+          </div>
+          <div className="wide-detail">
+            <span>Description</span>
+            <strong>{expense.description}</strong>
+          </div>
+        </div>
+      )
+    }
+
+    if (detailModal.type === 'staff') {
+      const staff = staffAccounts.find((item) => item.id === detailModal.id)
+      if (!staff) return null
+
+      eyebrow = 'Staff account'
+      title = staff.name
+      content = (
+        <div className="detail-grid-panel">
+          <div>
+            <span>Status</span>
+            <StatusPill status={staff.status} />
+          </div>
+          <div>
+            <span>Role</span>
+            <strong>{staff.role}</strong>
+          </div>
+          <div>
+            <span>Username</span>
+            <strong>@{staff.username}</strong>
+          </div>
+          <div>
+            <span>Account ID</span>
+            <strong>{staff.id}</strong>
+          </div>
+        </div>
+      )
+    }
+
+    if (detailModal.type === 'audit') {
+      const log = auditLogs.find((item) => item.id === detailModal.id)
+      if (!log) return null
+
+      eyebrow = 'Audit event'
+      title = log.action
+      content = (
+        <div className="detail-grid-panel">
+          <div>
+            <span>Actor</span>
+            <strong>{log.actor}</strong>
+          </div>
+          <div>
+            <span>Time</span>
+            <strong>{log.time}</strong>
+          </div>
+          <div>
+            <span>Event ID</span>
+            <strong>{log.id}</strong>
+          </div>
+          <div className="wide-detail">
+            <span>Details</span>
+            <strong>{log.detail}</strong>
+          </div>
+        </div>
+      )
+    }
+
+    if (!content) return null
+
+    return (
+      <div className="admin-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+        <section className="admin-modal-card detail-modal-card">
+          <div className="modal-heading">
+            <div>
+              <span>{eyebrow}</span>
+              <h2 id="detail-modal-title">{title}</h2>
+            </div>
+            <button className="icon-button" type="button" aria-label="Close details" onClick={() => setDetailModal(null)}>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
+          {content}
         </section>
       </div>
     )
@@ -2605,6 +3290,7 @@ function App() {
 
         return rankA === rankB ? a.name.localeCompare(b.name) : rankA - rankB
       })
+    const inventoryPageInfo = paginateItems(visibleInventoryRows, publicInventoryPage, pageSizes.publicInventory)
     const inventorySummaryCards = [
       {
         label: 'Total items',
@@ -2771,7 +3457,10 @@ function App() {
                   className={`inventory-category-chip ${selectedInventoryFilter === category ? 'active' : ''}`}
                   type="button"
                   key={category}
-                  onClick={() => setPublicInventoryFilter(category)}
+                  onClick={() => {
+                    setPublicInventoryFilter(category)
+                    setPublicInventoryPage(1)
+                  }}
                   aria-pressed={selectedInventoryFilter === category}
                 >
                   <Icon size={16} aria-hidden="true" />
@@ -2787,7 +3476,10 @@ function App() {
                 <input
                   type="search"
                   value={publicInventorySearch}
-                  onChange={(event) => setPublicInventorySearch(event.target.value)}
+                  onChange={(event) => {
+                    setPublicInventorySearch(event.target.value)
+                    setPublicInventoryPage(1)
+                  }}
                   placeholder="Search items, categories..."
                 />
               </label>
@@ -2808,7 +3500,7 @@ function App() {
                 <span aria-hidden="true" />
               </div>
               <div className="inventory-table-body">
-                {visibleInventoryRows.map((item) => {
+                {inventoryPageInfo.items.map((item) => {
                   const stockQty = Math.max(0, Number(item.stockQty) || 0)
                   const stockFill = `${Math.min(100, Math.max(stockQty > 0 ? 8 : 0, Math.round((stockQty / 30) * 100)))}%`
                   const displayStatus = stockStatus(item) === 'Unavailable' ? 'Out of Stock' : stockStatus(item)
@@ -2847,6 +3539,11 @@ function App() {
                 )}
               </div>
             </div>
+            <PaginationControls
+              label="public inventory"
+              pageInfo={inventoryPageInfo}
+              onPageChange={setPublicInventoryPage}
+            />
           </section>
         </div>
         <LoadingOverlay message={loadingMessage} />
@@ -2959,6 +3656,7 @@ function App() {
 
       {sidebarOpen && <button className="scrim" type="button" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />}
       {renderAdminModal()}
+      {renderDetailModal()}
       {renderInvoiceModal()}
       <LoadingOverlay message={loadingMessage} />
 

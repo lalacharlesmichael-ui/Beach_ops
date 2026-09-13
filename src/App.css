@@ -4039,3 +4039,205 @@ select {
     width: 100%;
   }
 }
+
+/* Motion and interaction layer */
+@keyframes modal-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 140% 0;
+  }
+
+  to {
+    background-position: -40% 0;
+  }
+}
+
+@keyframes status-card-pulse {
+  0% {
+    border-color: #8ed0ec;
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.28), 0 14px 32px rgba(8, 47, 73, 0.08);
+  }
+
+  45% {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 8px rgba(15, 118, 110, 0.13), 0 18px 36px rgba(8, 47, 73, 0.13);
+  }
+
+  100% {
+    border-color: var(--border);
+    box-shadow: 0 14px 32px rgba(8, 47, 73, 0.08);
+  }
+}
+
+@keyframes status-pill-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.06);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.admin-modal-overlay,
+.invoice-overlay {
+  animation: modal-overlay-in 160ms ease-out both;
+}
+
+.admin-modal-card,
+.invoice-card {
+  animation: modal-card-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: center;
+}
+
+.notice,
+.sweet-toast {
+  animation: toast-slide-in 220ms ease-out both;
+}
+
+.table-card,
+.menu-card,
+.menu-admin-card,
+.queue-card,
+.order-row,
+.staff-card,
+.timeline-row,
+.payment-order-chip,
+.inventory-metric,
+.inventory-table-row {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table-card:hover,
+  .menu-card:hover,
+  .menu-admin-card:hover,
+  .queue-card:hover,
+  .order-row:hover,
+  .staff-card:hover,
+  .timeline-row:hover,
+  .payment-order-chip:hover,
+  .inventory-metric:hover,
+  .inventory-table-row:hover {
+    transform: translateY(-2px);
+    border-color: #b9dff2;
+    box-shadow: 0 18px 36px rgba(8, 47, 73, 0.12);
+  }
+}
+
+.is-status-pulse {
+  animation: status-card-pulse 1.1s ease-out both;
+}
+
+.is-status-pulse .status-pill {
+  animation: status-pill-pulse 780ms ease-out both;
+}
+
+.loading-panel {
+  animation: modal-card-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.loading-skeleton {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.skeleton-line,
+.skeleton-card-row span {
+  display: block;
+  min-height: 12px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, #eaf3f8 0%, #f8fcff 46%, #eaf3f8 92%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.skeleton-line {
+  width: 72%;
+  justify-self: center;
+}
+
+.skeleton-line.wide {
+  width: 92%;
+}
+
+.skeleton-card-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.skeleton-card-row span {
+  min-height: 42px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .table-card:hover,
+  .menu-card:hover,
+  .menu-admin-card:hover,
+  .queue-card:hover,
+  .order-row:hover,
+  .staff-card:hover,
+  .timeline-row:hover,
+  .payment-order-chip:hover,
+  .inventory-metric:hover,
+  .inventory-table-row:hover,
+  .metric-button:hover,
+  .metric-button:focus-visible {
+    transform: none;
+  }
+}

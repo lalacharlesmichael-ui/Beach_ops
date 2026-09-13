@@ -337,6 +337,15 @@ function LoadingOverlay({ message }) {
       <div className="loading-panel">
         <RefreshCw size={28} aria-hidden="true" />
         <strong>{message}</strong>
+        <div className="loading-skeleton" aria-hidden="true">
+          <span className="skeleton-line wide" />
+          <span className="skeleton-line" />
+          <div className="skeleton-card-row">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -404,6 +413,7 @@ function App() {
   const [invoiceOrderId, setInvoiceOrderId] = useState(null)
   const [activeModal, setActiveModal] = useState(null)
   const [detailModal, setDetailModal] = useState(null)
+  const [statusPulseIds, setStatusPulseIds] = useState([])
   const [soundOn, setSoundOn] = useState(true)
   const [notice, setNotice] = useState(null)
   const [databaseReady, setDatabaseReady] = useState(false)
@@ -731,6 +741,14 @@ function App() {
     setDetailModal({ type, id })
   }
 
+  function pulseStatus(orderId) {
+    setStatusPulseIds((current) => (current.includes(orderId) ? current : [...current, orderId]))
+
+    window.setTimeout(() => {
+      setStatusPulseIds((current) => current.filter((id) => id !== orderId))
+    }, 1400)
+  }
+
   function handleDashboardShortcut(item) {
     if (item.kitchenFilter) {
       setKitchenQueueFilter(item.kitchenFilter)
@@ -1024,6 +1042,7 @@ function App() {
     setSelectedPaymentOrderId(null)
     setInvoiceOrderId(order.id)
     setActiveView('Kitchen/Bar Queue')
+    pulseStatus(order.id)
     addAudit('Cash payment confirmed', `${order.id} was marked Paid and queued`)
     notify(`${order.id} is paid. Show the invoice so the customer can take a photo.`)
   }
@@ -1046,6 +1065,7 @@ function App() {
     setOrders((current) =>
       current.map((item) => (item.id === orderId ? { ...item, status: nextStatus } : item)),
     )
+    pulseStatus(orderId)
     addAudit('Order status changed', `${orderId} moved to ${nextStatus}`)
     notify(`${orderId} moved to ${nextStatus}.`)
   }
@@ -1999,7 +2019,12 @@ function App() {
             kitchenQueuePageInfo.items.map((order) => {
               const table = tables.find((item) => item.id === order.tableId)
               return (
-                <article className={`queue-card status-card-${order.status.toLowerCase().replaceAll(' ', '-')}`} key={order.id}>
+                <article
+                  className={`queue-card status-card-${order.status.toLowerCase().replaceAll(' ', '-')} ${
+                    statusPulseIds.includes(order.id) ? 'is-status-pulse' : ''
+                  }`}
+                  key={order.id}
+                >
                   <div className="card-topline">
                     <span>{stationsForOrder(order)}</span>
                     <StatusPill status={order.status} />
@@ -2085,7 +2110,7 @@ function App() {
             activeOrdersPageInfo.items.map((order) => {
               const table = tables.find((item) => item.id === order.tableId)
               return (
-                <article className="order-row" key={order.id}>
+                <article className={`order-row ${statusPulseIds.includes(order.id) ? 'is-status-pulse' : ''}`} key={order.id}>
                   <div className="order-main">
                     <div>
                       <span>
